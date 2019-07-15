@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		67330E7D22DC923900AB3594 /* main.c in Sources */ = {isa = PBXBuildFile; fileRef = 67330E7C22DC923900AB3594 /* main.c */; };
+		67330E8922DCA4F100AB3594 /* util.c in Sources */ = {isa = PBXBuildFile; fileRef = 67330E8822DCA4F100AB3594 /* util.c */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -25,6 +26,10 @@
 /* Begin PBXFileReference section */
 		67330E7922DC923900AB3594 /* SpMV-MPI */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "SpMV-MPI"; sourceTree = BUILT_PRODUCTS_DIR; };
 		67330E7C22DC923900AB3594 /* main.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = main.c; sourceTree = "<group>"; };
+		67330E8522DCA28800AB3594 /* cavity02.mtx */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = cavity02.mtx; sourceTree = "<group>"; };
+		67330E8622DCA28800AB3594 /* fidapm08.mtx */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = fidapm08.mtx; sourceTree = "<group>"; };
+		67330E8722DCA4F100AB3594 /* util.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = util.h; sourceTree = "<group>"; };
+		67330E8822DCA4F100AB3594 /* util.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; path = util.c; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -58,6 +63,10 @@
 			isa = PBXGroup;
 			children = (
 				67330E7C22DC923900AB3594 /* main.c */,
+				67330E8722DCA4F100AB3594 /* util.h */,
+				67330E8822DCA4F100AB3594 /* util.c */,
+				67330E8522DCA28800AB3594 /* cavity02.mtx */,
+				67330E8622DCA28800AB3594 /* fidapm08.mtx */,
 			);
 			path = "SpMV-MPI";
 			sourceTree = "<group>";
@@ -119,6 +128,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				67330E7D22DC923900AB3594 /* main.c in Sources */,
+				67330E8922DCA4F100AB3594 /* util.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -176,10 +186,16 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				HEADER_SEARCH_PATHS = /usr/local/include;
+				LIBRARY_SEARCH_PATHS = /usr/local/lib;
 				MACOSX_DEPLOYMENT_TARGET = 10.14;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
+				OTHER_LDFLAGS = (
+					"-lm",
+					"-lmpi",
+				);
 				SDKROOT = macosx;
 			};
 			name = Debug;
@@ -229,9 +245,15 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
+				HEADER_SEARCH_PATHS = /usr/local/include;
+				LIBRARY_SEARCH_PATHS = /usr/local/lib;
 				MACOSX_DEPLOYMENT_TARGET = 10.14;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
+				OTHER_LDFLAGS = (
+					"-lm",
+					"-lmpi",
+				);
 				SDKROOT = macosx;
 			};
 			name = Release;
