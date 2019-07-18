@@ -16,6 +16,6 @@
 
 #define MASTER 0
 
-void read_matrix(int **row_ptr, int **col_ind, float **values, const char *filename, int *num_rows, int *num_cols, int *num_vals);
+void read_matrix(int **row_ptr, int **col_ind, double **values, const char *filename, int *num_rows, int *num_cols, int *num_vals);
 
 #endif /* util_h */
