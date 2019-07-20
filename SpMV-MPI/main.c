@@ -10,10 +10,7 @@
 #include "mpi.h"
 
 void multiply(int num_rows, int *row_ptr, int *col_ind, float *values, float *vector, float *result);
-
-// FIXME: CHANGE
-int reindex(int *colInd, int numE, int myid, int numprocs, int nrows, int myVecSize,
-                     int *remoteVecCount, int *remoteVecPtr, int **remoteVecIndex, float **myVecData);
+int reindex(int *local_col_ind, int *remote_vector_item_counts, int *remote_vector_ptr, int **remote_vector_item_indices, float **my_vector_data, int local_matrix_item_count, int rank, int num_procs, int num_rows, int local_vector_size);
 
 int main(int argc, char * argv[]) {
     int num_procs, rank, num_rows;
@@ -24,12 +21,9 @@ int main(int argc, char * argv[]) {
     MPI_Comm_size(MPI_COMM_WORLD, &num_procs);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     
-    // FIXME: CHANGE
-    int remoteVecCount[num_procs], remoteVecPtr[num_procs];
-    int tosendVecCount[num_procs], tosendVecPtr[num_procs];
-    int tosendTotal = 0, remote_vector_item_count = 0;
-    int *remoteVecIndex, *tosendVecIndex;
-    float *sendVecData;
+    int remote_vector_item_counts[num_procs], remote_vector_ptr[num_procs], to_send_vector_item_counts[num_procs], to_send_vector_ptr[num_procs];
+    int to_send_total = 0, remote_vector_item_count = 0, *remote_vector_item_index, *to_send_vector_item_index;
+    float *to_send_vector_data;
 
     if(rank == MASTER) {
         // Read the matrix into CSR format
@@ -93,31 +87,31 @@ int main(int argc, char * argv[]) {
         // Append remote vector items needed to the local vector,
         // Re-index local col_ind
         // Return total number of remote vector items needed
-        remote_vector_item_count = reindex(local_col_ind, local_matrix_item_count, rank, num_procs, num_rows, vector_item_count, remoteVecCount, remoteVecPtr, &remoteVecIndex, &local_vector_data);
+        remote_vector_item_count = reindex(local_col_ind, remote_vector_item_counts, remote_vector_ptr, &remote_vector_item_index, &local_vector_data, local_matrix_item_count, rank, num_procs, num_rows, vector_item_count);
         
         // All to all comm. for the number of remote vector items needed
-        MPI_Alltoall(remoteVecCount,1,MPI_INT,tosendVecCount,1,MPI_INT,MPI_COMM_WORLD);
+        MPI_Alltoall(remote_vector_item_counts,1,MPI_INT,to_send_vector_item_counts,1,MPI_INT,MPI_COMM_WORLD);
         
         for (int p = 0; p < num_procs; p++)
-            tosendTotal = tosendTotal + tosendVecCount[p];
-        tosendVecIndex = malloc(tosendTotal * sizeof(int));
-        tosendVecPtr[0] = 0;
+            to_send_total = to_send_total + to_send_vector_item_counts[p];
+        to_send_vector_item_index = malloc(to_send_total * sizeof(int));
+        to_send_vector_ptr[0] = 0;
         for (int p = 1; p < num_procs; p++)
-            tosendVecPtr[p] = tosendVecPtr[p-1] + tosendVecCount[p-1];
+            to_send_vector_ptr[p] = to_send_vector_ptr[p-1] + to_send_vector_item_counts[p-1];
         
         // All to all comm. for the index of remote vector items needed
-        MPI_Alltoallv(remoteVecIndex, remoteVecCount, remoteVecPtr, MPI_INT, tosendVecIndex, tosendVecCount, tosendVecPtr, MPI_INT, MPI_COMM_WORLD);
+        MPI_Alltoallv(remote_vector_item_index, remote_vector_item_counts, remote_vector_ptr, MPI_INT, to_send_vector_item_index, to_send_vector_item_counts, to_send_vector_ptr, MPI_INT, MPI_COMM_WORLD);
         
         // Vector items to be sent
-        sendVecData = malloc(tosendTotal * sizeof(float));
-        for (int i = 0; i < tosendTotal; i++)
-            sendVecData[i] = local_vector_data[tosendVecIndex[i]];
+        to_send_vector_data = malloc(to_send_total * sizeof(float));
+        for (int i = 0; i < to_send_total; i++)
+            to_send_vector_data[i] = local_vector_data[to_send_vector_item_index[i]];
         
         // Remote vector items are appended to local vector items
         float *recvVecData = local_vector_data + vector_item_count;
         
         // All to all comm. for the vector items
-        MPI_Alltoallv(sendVecData, tosendVecCount, tosendVecPtr, MPI_FLOAT, recvVecData, remoteVecCount, remoteVecPtr, MPI_FLOAT, MPI_COMM_WORLD);
+        MPI_Alltoallv(to_send_vector_data, to_send_vector_item_counts, to_send_vector_ptr, MPI_FLOAT, recvVecData, remote_vector_item_counts, remote_vector_ptr, MPI_FLOAT, MPI_COMM_WORLD);
         
         // Compute local result
         local_result = malloc(vector_item_count * sizeof(float));
@@ -135,8 +129,7 @@ int main(int argc, char * argv[]) {
         free(total_result);
         
     } else { // Workers
-        // FIXME: CHANGE
-        int *col_ind, *matrix_item_count, *matrix_item_indices, *row_ptr, *vecDataSize, *vecDataDispls;
+        int *col_ind, *matrix_item_count, *matrix_item_indices, *row_ptr, *vector_item_counts, *vector_item_start_indices;
         float *matrix_values;
         
         MPI_Bcast(&num_rows, 1, MPI_INT, MASTER, MPI_COMM_WORLD);
@@ -149,13 +142,13 @@ int main(int argc, char * argv[]) {
         local_vector_data = malloc(vector_item_count * sizeof(float));
         
         // Receive vector items from master
-        MPI_Scatterv(all_vector_data, vecDataSize, vecDataDispls, MPI_FLOAT, local_vector_data, vector_item_count, MPI_FLOAT, MASTER, MPI_COMM_WORLD);
+        MPI_Scatterv(all_vector_data, vector_item_counts, vector_item_start_indices, MPI_FLOAT, local_vector_data, vector_item_count, MPI_FLOAT, MASTER, MPI_COMM_WORLD);
         
         MPI_Scatter(matrix_item_count, 1, MPI_INT, &local_matrix_item_count, 1, MPI_INT, MASTER, MPI_COMM_WORLD);
         
         // Receive matrix items from master
         local_row_ptr = malloc((vector_item_count + 1) * sizeof(int));
-        MPI_Scatterv(row_ptr, vecDataSize, vecDataDispls, MPI_INT, local_row_ptr, vector_item_count, MPI_INT, MASTER, MPI_COMM_WORLD);
+        MPI_Scatterv(row_ptr, vector_item_counts, vector_item_start_indices, MPI_INT, local_row_ptr, vector_item_count, MPI_INT, MASTER, MPI_COMM_WORLD);
         int row_ptr_offset = local_row_ptr[0];
         for (int i = 0; i < vector_item_count; i++)
             local_row_ptr[i] = local_row_ptr[i] - row_ptr_offset;
@@ -170,49 +163,49 @@ int main(int argc, char * argv[]) {
         // Append remote vector items needed to the local vector,
         // Re-index local col_ind
         // Return total number of remote vector items needed
-        remote_vector_item_count = reindex(local_col_ind, local_matrix_item_count, rank, num_procs, num_rows, vector_item_count, remoteVecCount, remoteVecPtr, &remoteVecIndex, &local_vector_data);
+        remote_vector_item_count = reindex(local_col_ind, remote_vector_item_counts, remote_vector_ptr, &remote_vector_item_index, &local_vector_data, local_matrix_item_count, rank, num_procs, num_rows, vector_item_count);
         
         // All to all comm. for the number of remote vector items needed
-        MPI_Alltoall(remoteVecCount, 1, MPI_INT, tosendVecCount, 1, MPI_INT, MPI_COMM_WORLD);
+        MPI_Alltoall(remote_vector_item_counts, 1, MPI_INT, to_send_vector_item_counts, 1, MPI_INT, MPI_COMM_WORLD);
         
         for (int p = 0; p < num_procs; p++)
-            tosendTotal = tosendTotal + tosendVecCount[p];
-        tosendVecIndex = malloc(tosendTotal * sizeof(int));
-        tosendVecPtr[0] = 0;
+            to_send_total = to_send_total + to_send_vector_item_counts[p];
+        to_send_vector_item_index = malloc(to_send_total * sizeof(int));
+        to_send_vector_ptr[0] = 0;
         for (int p = 1; p < num_procs; p++)
-            tosendVecPtr[p] = tosendVecPtr[p-1] + tosendVecCount[p-1];
+            to_send_vector_ptr[p] = to_send_vector_ptr[p-1] + to_send_vector_item_counts[p-1];
         
         // All to all comm. for the index of remote vector items needed
-        MPI_Alltoallv(remoteVecIndex, remoteVecCount, remoteVecPtr, MPI_INT, tosendVecIndex, tosendVecCount, tosendVecPtr, MPI_INT, MPI_COMM_WORLD);
+        MPI_Alltoallv(remote_vector_item_index, remote_vector_item_counts, remote_vector_ptr, MPI_INT, to_send_vector_item_index, to_send_vector_item_counts, to_send_vector_ptr, MPI_INT, MPI_COMM_WORLD);
         
         // Vector items to be sent
-        sendVecData = (float *)malloc(sizeof(float) * tosendTotal);
-        for (int i = 0; i < tosendTotal; i++)
-            sendVecData[i] = local_vector_data[tosendVecIndex[i]-rank*size];
+        to_send_vector_data = (float *)malloc(sizeof(float) * to_send_total);
+        for (int i = 0; i < to_send_total; i++)
+            to_send_vector_data[i] = local_vector_data[to_send_vector_item_index[i]-rank*size];
         
         // Remote vector items are appended to local vector items
         float *recvVecData = local_vector_data + vector_item_count;
         
         // All to all comm. for the vector items
-        MPI_Alltoallv(sendVecData, tosendVecCount, tosendVecPtr, MPI_FLOAT, recvVecData, remoteVecCount, remoteVecPtr, MPI_FLOAT, MPI_COMM_WORLD);
+        MPI_Alltoallv(to_send_vector_data, to_send_vector_item_counts, to_send_vector_ptr, MPI_FLOAT, recvVecData, remote_vector_item_counts, remote_vector_ptr, MPI_FLOAT, MPI_COMM_WORLD);
         
         // Compute local result
         local_result = malloc(vector_item_count * sizeof(float));
         multiply(vector_item_count, local_row_ptr, local_col_ind, local_matrix_values, local_vector_data, local_result);
         
         // Send local result to master
-        MPI_Gatherv(local_result, vector_item_count, MPI_FLOAT, total_result, vecDataSize, vecDataDispls, MPI_FLOAT, MASTER, MPI_COMM_WORLD);
+        MPI_Gatherv(local_result, vector_item_count, MPI_FLOAT, total_result, vector_item_counts, vector_item_start_indices, MPI_FLOAT, MASTER, MPI_COMM_WORLD);
     }
     
     // FIXME: Clean up
     free(local_row_ptr);
     free(local_col_ind);
     free(local_matrix_values);
-    free(tosendVecIndex);
-    free(sendVecData);
+    free(to_send_vector_item_index);
+    free(to_send_vector_data);
     free(local_result);
     free(local_vector_data);
-    free(remoteVecIndex);
+    free(remote_vector_item_index);
     
     // MPI_Barrier(MPI_COMM_WORLD); Check all the mallocs to free
     
@@ -235,53 +228,48 @@ void multiply(int num_rows, int *row_ptr, int *col_ind, float *values, float *ve
 // Append remote vector items needed to the local vector,
 // Re-index local col_ind
 // Return total number of remote vector items needed
-// FIXME: CHANGE PARAMS
-int reindex(int *local_col_ind, int myNumE, int rank, int num_procs, int num_rows, int myVecSize, int *remoteVecCount, int *remoteVecPtr, int **remoteVecIndex, float **myVecData) {
+int reindex(int *local_col_ind, int *remote_vector_item_counts, int *remote_vector_ptr, int **remote_vector_item_indices, float **my_vector_data, int local_matrix_item_count, int rank, int num_procs, int num_rows, int local_vector_size) {
     int size = ceil((float) num_rows / num_procs);
     int local_vector_start_index = rank * size;
     int local_vector_end_index = (rank + 1) * size;
     
-    // FIXME: CHANGE
-    int tempRemoteVecCount[num_procs];
-    
-    // FIXME: CHANGE
+    int temp_remote_vector_item_counts[num_procs];
     for (int i = 0; i < num_procs; i++)
-        remoteVecCount[i] = 0;
-    *remoteVecIndex = (int *)malloc(sizeof(int) * myNumE);
+        remote_vector_item_counts[i] = 0;
+    *remote_vector_item_indices = malloc(local_matrix_item_count * sizeof(int));
     
-    // Select remote vectors (counts, indices, displacements from each remote processor)
-    int numRemoteVec = 0;
-    for (int i = 0; i < myNumE; i++) {
+    // Select remote vector items
+    int remote_vec_item_count = 0;
+    for (int i = 0; i < local_matrix_item_count; i++) {
         if ((local_col_ind[i] < local_vector_start_index) || (local_col_ind[i] >= local_vector_end_index)) {
-            remoteVecCount[local_col_ind[i]/size]++;
-            numRemoteVec++;
+            remote_vector_item_counts[local_col_ind[i]/size]++;
+            remote_vec_item_count++;
         }
     }
-    remoteVecPtr[0] = 0;
-    tempRemoteVecCount[0] = 0;
+    remote_vector_ptr[0] = 0;
+    temp_remote_vector_item_counts[0] = 0;
     for (int i = 1; i < num_procs; i++) {
-        remoteVecPtr[i] = remoteVecPtr[i-1] + remoteVecCount[i-1];
-        tempRemoteVecCount[i]=0;
+        remote_vector_ptr[i] = remote_vector_ptr[i-1] + remote_vector_item_counts[i-1];
+        temp_remote_vector_item_counts[i]=0;
     }
     
-    // Realloc local vector array to store received remote vector entries
-    *myVecData = (float *)realloc(*myVecData,sizeof(float) * (myVecSize+numRemoteVec));
+    // Expand local vector array to store remote vector items
+    *my_vector_data = realloc(*my_vector_data, (local_vector_size+remote_vec_item_count) * sizeof(float));
     
-    // Re-index the local Column Index array to point to local Vector Data entry at the beginning and remote Vector Data entries at the end of Vector Data array.
+    // Re-index local col_ind to point to local vector items and the remote items appended to the end
     int proc = 0;
-    for (int i = 0; i < myNumE; i++) {
+    for (int i = 0; i < local_matrix_item_count; i++) {
         if ((local_col_ind[i] < local_vector_start_index) || (local_col_ind[i] >= local_vector_end_index)) {
-            proc = local_col_ind[i]/size;
-            (*remoteVecIndex)[remoteVecPtr[proc]+tempRemoteVecCount[proc]] = local_col_ind[i];
+            proc = local_col_ind[i] / size;
+            (*remote_vector_item_indices)[remote_vector_ptr[proc] + temp_remote_vector_item_counts[proc]] = local_col_ind[i];
             
-            local_col_ind[i] = myVecSize + remoteVecPtr[proc] + tempRemoteVecCount[proc];
-            tempRemoteVecCount[proc]++;
-        }
-        else {
+            local_col_ind[i] = local_vector_size + remote_vector_ptr[proc] + temp_remote_vector_item_counts[proc];
+            temp_remote_vector_item_counts[proc]++;
+        } else {
             local_col_ind[i] -= (rank * size);
         }
     }
     
-    //return total number of remote vector entries needed
-    return numRemoteVec;
+    // Return total number of remote vector items needed
+    return remote_vec_item_count;
 }
