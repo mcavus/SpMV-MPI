@@ -9,7 +9,7 @@
 #include "util.h"
 
 // Reads a sparse matrix and represents it using CSR (Compressed Sparse Row) format
-void read_matrix(int **row_ptr, int **col_ind, double **values, const char *filename, int *num_rows, int *num_cols, int *num_vals) {
+void read_matrix(int **row_ptr, int **col_ind, float **values, const char *filename, int *num_rows, int *num_cols, int *num_vals) {
     FILE *file = fopen(filename, "r");
     if (file == NULL) {
         fprintf(stdout, "File cannot be opened!\n");
@@ -21,7 +21,7 @@ void read_matrix(int **row_ptr, int **col_ind, double **values, const char *file
     
     int *row_ptr_t = (int *) malloc((*num_rows + 1) * sizeof(int));
     int *col_ind_t = (int *) malloc(*num_vals * sizeof(int));
-    double *values_t = (double *) malloc(*num_vals * sizeof(double));
+    float *values_t = (float *) malloc(*num_vals * sizeof(float));
     
     // Collect occurances of each row for determining the indices of row_ptr
     int *row_occurances = (int *) malloc(*num_rows * sizeof(int));
@@ -30,8 +30,8 @@ void read_matrix(int **row_ptr, int **col_ind, double **values, const char *file
     }
     
     int row, column;
-    double value;
-    while (fscanf(file, "%d %d %lf\n", &row, &column, &value) != EOF) {
+    float value;
+    while (fscanf(file, "%d %d %f\n", &row, &column, &value) != EOF) {
         // Subtract 1 from row and column indices to match C format
         row--;
         column--;
@@ -58,7 +58,7 @@ void read_matrix(int **row_ptr, int **col_ind, double **values, const char *file
     
     fscanf(file, "%d %d %d\n", num_rows, num_cols, num_vals);
     int i = 0;
-    while (fscanf(file, "%d %d %lf\n", &row, &column, &value) != EOF) {
+    while (fscanf(file, "%d %d %f\n", &row, &column, &value) != EOF) {
         row--;
         column--;
         
