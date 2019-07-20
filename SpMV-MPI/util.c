@@ -19,9 +19,9 @@ void read_matrix(int **row_ptr, int **col_ind, float **values, const char *filen
     // Get number of rows, columns, and non-zero values
     fscanf(file, "%d %d %d\n", num_rows, num_cols, num_vals);
     
-    int *row_ptr_t = (int *) malloc((*num_rows + 1) * sizeof(int));
-    int *col_ind_t = (int *) malloc(*num_vals * sizeof(int));
-    float *values_t = (float *) malloc(*num_vals * sizeof(float));
+    int *row_ptr_t = malloc((*num_rows + 1) * sizeof(int));
+    int *col_ind_t = malloc(*num_vals * sizeof(int));
+    float *values_t = malloc(*num_vals * sizeof(float));
     
     // Collect occurances of each row for determining the indices of row_ptr
     int *row_occurances = (int *) malloc(*num_rows * sizeof(int));
