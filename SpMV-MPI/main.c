@@ -209,7 +209,7 @@ int main(int argc, char * argv[]) {
             
             MPI_Barrier(MPI_COMM_WORLD); //Check all the mallocs to free
             
-            // FIXME: Clean up
+            // Clean up
             free(local_row_ptr);
             free(local_col_ind);
             free(local_matrix_values);
