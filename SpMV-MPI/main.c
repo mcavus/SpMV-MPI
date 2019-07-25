@@ -40,6 +40,7 @@ int main(int argc, char * argv[]) {
                 float *values;
                 read_matrix(&row_ptr, &col_ind, &values, filename, &num_rows, &num_cols, &num_vals);
                 
+                // FIXME: Change file i/o to code alloc and save
                 // Read the vector
                 float *vector_values = malloc(num_rows * sizeof(float));
                 /*
@@ -98,7 +99,7 @@ int main(int argc, char * argv[]) {
                 remote_vector_item_count = reindex(local_col_ind, remote_vector_item_counts, remote_vector_ptr, &remote_vector_item_indices, &local_vector_data, local_matrix_item_count, rank, num_procs, num_rows, vector_item_count);
                 
                 // All to all comm. for the number of remote vector items needed
-                MPI_Alltoall(remote_vector_item_counts,1,MPI_INT,to_send_vector_item_counts,1,MPI_INT,MPI_COMM_WORLD);
+                MPI_Alltoall(remote_vector_item_counts, 1, MPI_INT, to_send_vector_item_counts, 1, MPI_INT,MPI_COMM_WORLD);
                 
                 for (int p = 0; p < num_procs; p++)
                     to_send_total = to_send_total + to_send_vector_item_counts[p];
